@@ -1,0 +1,3 @@
+tabulate
+pymaybe
+python-dotenv

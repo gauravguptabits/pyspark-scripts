@@ -1,0 +1,15 @@
+{
+    "database_config": {
+        "db_name": "bigdata",
+        "collection": "twitterStreamData",
+        "db_host": "localhost:27017"
+    },
+    "sink": {
+        "folder": "./datalake"
+    },
+    "checkpoint_config": {
+        "database": "Migration_Catalogue",
+        "schema": "migration_checkpoints",
+        "table": "Checkpoint"
+    }
+}
