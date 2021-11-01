@@ -261,8 +261,8 @@ def analyze(spark, sc):
         # TODO: Do your task here.
         print('Fetching full load data from Mongo')
         df = read_data_from_source(curr_ckpt_info, config, spark)
-        count = df.count()
-        print('## Number of records to copy - {}'.format(count))
+        # count = df.count()
+        # print('## Number of records to copy - {}'.format(count))
         copy_data_to_sink(df, sink_options)
         run_info['run_end_at'] = datetime.datetime.now()
         curr_ckpt_info.update_run_info(run_info)
