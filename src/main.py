@@ -24,7 +24,7 @@ except:
     import pyspark
 from pyspark.sql import SparkSession
 
-__author__ = 'ekampf'
+__author__ = 'Impressico'
 
 
 if __name__ == '__main__':
@@ -34,6 +34,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     print("Called with arguments: %s" % args)
+    # TODO: Load config here.
 
     environment = {
         'PYSPARK_JOB_ARGS': ' '.join(args.job_args) if args.job_args else ''
@@ -47,6 +48,7 @@ if __name__ == '__main__':
 
     print('\nRunning job %s...\nenvironment is %s\n' % (args.job_name, environment))
 
+    # TODO: supply Spark config while creating spark object.
     os.environ.update(environment)
     spark = SparkSession.\
                 builder.\
@@ -59,6 +61,7 @@ if __name__ == '__main__':
     job_module = importlib.import_module('jobs.%s' % args.job_name)
 
     start = time.time()
+    # TODO: Supply Config to the job as argument.
     job_module.analyze(spark, sc, **job_args)
     end = time.time()
 
