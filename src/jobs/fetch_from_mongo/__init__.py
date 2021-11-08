@@ -8,6 +8,7 @@ import json
 import os
 import datetime
 import uuid
+from pyspark.sql.functions import lit
 
 __author__ = 'gaurav'
 
@@ -119,7 +120,7 @@ class CheckpointInfo:
         df = spark.createDataFrame([data], schema=schema)
         df.write.format('jdbc')\
             .options(
-                url='jdbc:postgresql://172.20.23.143:5432/Migration_Catalogue',
+                url='jdbc:postgresql://localhost:5432/Migration_Catalogue',
                 dbtable='migration_checkpoints."Checkpoint"',
                 user='postgres',
                 password='postgres',
@@ -143,7 +144,7 @@ def read_last_checkpoint_info(spark):
     print('## Reading last checkpoint ##')
     jdbcDF2 = spark.read.format("jdbc").\
         options(
-            url='jdbc:postgresql://172.20.23.143:5432/Migration_Catalogue',
+            url='jdbc:postgresql://localhost:5432/Migration_Catalogue',
             query='select * from migration_checkpoints."Checkpoint" where run_status=\'SUCCESS\' order by run_started_at desc NULLS LAST limit 1',
             user='postgres',
             password='postgres',
@@ -203,7 +204,8 @@ def read_data_from_source(ckpt_info, config, spark):
     df = spark.read.format("mongo")\
             .option("uri", input_uri)\
             .option("database", database)\
-            .option("sampleSize", 50000)\
+            .option("sampleSize", 100000)\
+            .option("samplePoolSize", 100000)\
             .option("collection", collection)\
             .option("pipeline", agg_query)\
             .load()
@@ -212,24 +214,21 @@ def read_data_from_source(ckpt_info, config, spark):
 def transform_data(data):
     return data
 
-def copy_data_to_sink(df, sink_options):
+def copy_data_to_sink(df, sink_options, curr_ckpt_info):
     # TODO: prevent entry of duplicate into the HDFS.
     sink_folder = sink_options.get('sink_folder', None)
+    
     df.select(
             col('brand'), 
             col('category'), 
-            col("tweetInfo").cast('string')) \
+            col("created_at"),
+            col("tweetInfo")) \
         .write \
         .option("header", True) \
-        .partitionBy(["category", "brand"]) \
+        .partitionBy(["category", "brand", "created_at"]) \
         .mode("append") \
-        .csv(sink_folder)
+        .json(sink_folder)
     return df
-
-def test_rdd(spark):
-    df = spark.createDataFrame([1.0, 2.0, 3.0], FloatType())
-    df.show()
-    return 
 
 def prepare_run_info():
     run_info = {
@@ -255,7 +254,6 @@ def analyze(spark, sc):
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
                                                             curr_ckpt_info)
-        # test_rdd(spark)
         curr_ckpt_info.run_status = 'RUNNING'
         curr_ckpt_info.update_in_db(spark)
         # TODO: Do your task here.
@@ -263,7 +261,9 @@ def analyze(spark, sc):
         df = read_data_from_source(curr_ckpt_info, config, spark)
         # count = df.count()
         # print('## Number of records to copy - {}'.format(count))
-        copy_data_to_sink(df, sink_options)
+        data_for_date = curr_ckpt_info.query_params.get('end_dt').date()
+        df = df.withColumn("created_at", lit(data_for_date))
+        copy_data_to_sink(df, sink_options, curr_ckpt_info)
         run_info['run_end_at'] = datetime.datetime.now()
         curr_ckpt_info.update_run_info(run_info)
         print('## Printing dataframe sample.')
