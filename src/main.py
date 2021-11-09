@@ -71,6 +71,7 @@ if __name__ == '__main__':
     # TODO: supply Spark config while creating spark object.
     os.environ.update(environment)
     sparkcon = config.get('spark_conf',None)
+    
     sparkBuilder = SparkSession.builder
     for k,v in sparkcon.items():
         print('key & Values===============',k,v)
