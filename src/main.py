@@ -28,10 +28,12 @@ from pyspark.sql import SparkSession
 
 __author__ = 'Impressico'
 
+
 def load_config():
     cwd = os.getcwd()
-    path_config_env = os.path.join(cwd, "config", "fetch_from_mongo", "config.env")
-    path_config_json = os.path.join(cwd, "config", "fetch_from_mongo", "config.json")
+    job_name = 'fetch_from_mongo'
+    path_config_env = os.path.join(cwd, "config", job_name, "config.env")
+    path_config_json = os.path.join(cwd, "config", job_name, "config.json")
 
     load_dotenv(str(path_config_env))
     MONGO_USER_NAME = os.getenv('MONGO_USER_NAME')
