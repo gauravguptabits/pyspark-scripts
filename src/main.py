@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # TODO: Supply Config to the job as argument.
-    job_module.analyze(spark, sc,config, **job_args)
+    job_module.analyze(spark, sc, config, **job_args)
     end = time.time()
 
     print("\nExecution of job %s took %s seconds" % (args.job_name, end-start))

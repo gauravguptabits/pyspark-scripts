@@ -132,7 +132,7 @@ class CheckpointInfo:
             Query Param: {self.query_params}
         '''
 
-def read_last_checkpoint_info(spark):
+def read_last_checkpoint_info(spark, config):
     print('## Reading last checkpoint ##')
     config = load_config()
     read_con = config.get('read_config',{})
@@ -240,7 +240,7 @@ def prepare_run_info():
     }
     return run_info
 
-def analyze(spark, sc,config):
+def analyze(spark, sc, config):
     # Prepare meta-data.
     print('## Loading configuration ##')
     input_uri = prepare_db_uri(config)
@@ -252,7 +252,7 @@ def analyze(spark, sc,config):
     curr_ckpt_info = CheckpointInfo()
     print("Source to Sink: {} --> {}".format(input_uri, sink_folder))
     try:
-        l_ckpt_info = read_last_checkpoint_info(spark)
+        l_ckpt_info = read_last_checkpoint_info(spark, config)
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
                                                             curr_ckpt_info)

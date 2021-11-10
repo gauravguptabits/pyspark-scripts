@@ -31,7 +31,7 @@
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "./datastore"
+        "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datastore"
     
     }
     },
@@ -39,9 +39,9 @@
         "spark.mongodb.input.partitioner": "MongoSamplePartitioner",
         "spark.mongodb.input.partitionerOptions.partitionSizeMB": "128",
         "spark.mongodb.input.partitionerOptions.partitionKey": "brand",
-        "spark.executor.memory": "2g",
+        "spark.executor.memory": "4g",
         "spark.executor.cores": "2",
-        "spark.driver.memory": "2g"
+        "spark.driver.memory": "1g"
     }
 
 }    
