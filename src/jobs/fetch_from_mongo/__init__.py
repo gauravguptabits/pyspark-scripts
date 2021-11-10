@@ -79,8 +79,7 @@ class CheckpointInfo:
         self.query_params['end_dt'] = old_end_time + datetime.timedelta(seconds=24*60*60)
         return self
 
-    def update_in_db(self,spark):
-        config = load_config()
+    def update_in_db(self,spark,config):
         print('## Updating checkpoint in DB\n{}'.format(self))
         schema = StructType([
             StructField("source", StringType(), True),
@@ -134,7 +133,6 @@ class CheckpointInfo:
 
 def read_last_checkpoint_info(spark, config):
     print('## Reading last checkpoint ##')
-    config = load_config()
     read_con = config.get('read_config',{})
     db_host = read_con.get('checkpoint',{}).get('db_host',None)
     database = read_con.get('checkpoint',{}).get('database',None)
@@ -257,7 +255,7 @@ def analyze(spark, sc, config):
                                                             run_info, spark, 
                                                             curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'
-        curr_ckpt_info.update_in_db(spark)
+        curr_ckpt_info.update_in_db(spark,config)
         # TODO: Do your task here.
         print('Fetching full load data from Mongo')
         df = read_data_from_source(curr_ckpt_info, config, spark)
@@ -277,6 +275,6 @@ def analyze(spark, sc, config):
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.datetime.now()
-        curr_ckpt_info.update_in_db(spark)
+        curr_ckpt_info.update_in_db(spark,config)
     print("xxxxxxxxxx Exiting from script xxxxxxxxxxxxx")
     return 

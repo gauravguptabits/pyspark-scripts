@@ -31,7 +31,7 @@
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datastore"
+        "folder": "datastore"
     
     }
     },
