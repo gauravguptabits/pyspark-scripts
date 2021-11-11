@@ -1,15 +1,48 @@
 {
-    "database_config": {
-        "db_name": "bigdata",
-        "collection": "twitterStreamData",
-        "db_host": "localhost:27017"
+    "read_config": {
+        "checkpoint": {
+            "store_name": "POSTGRES",
+            "username": "postgres",
+            "password": "postgres",
+            "database" : "Migration_Catalogue",
+            "schema": "migration_checkpoints",
+            "table": "Checkpoint",
+            "driver" : "org.postgresql.Driver",
+            "db_host": "localhost:5432"
+        },
+        "data": {
+            "store_name": "MONGO",
+            "db_name": "bigdata",
+            "collection": "twitterStreamData",
+            "db_host": "localhost:27017"
+        }
+        
+},
+    "write_config": {
+        "checkpoint": {
+            "store_name": "POSTGRES",
+            "username" :"postgres",
+            "password" :"postgres",
+            "database" : "Migration_Catalogue",
+            "schema" :"migration_checkpoints",
+            "table" :"Checkpoint",
+            "driver" : "org.postgresql.Driver",
+            "db_host" :"localhost:5432"
     },
-    "sink": {
-        "folder": "./datalake"
-    },
-    "checkpoint_config": {
-        "database": "Migration_Catalogue",
-        "schema": "migration_checkpoints",
-        "table": "Checkpoint"
+    "data": {
+        "store_name": "HDFS",    
+        "folder": "datastore"
+    
     }
-}
+    },
+    "spark_conf": {
+        "spark.mongodb.input.partitioner": "MongoSamplePartitioner",
+        "spark.mongodb.input.partitionerOptions.partitionSizeMB": "128",
+        "spark.mongodb.input.partitionerOptions.partitionKey": "brand",
+        "spark.executor.memory": "4g",
+        "spark.executor.cores": "2",
+        "spark.driver.memory": "1g"
+    }
+
+}    
+

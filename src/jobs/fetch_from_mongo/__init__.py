@@ -3,41 +3,23 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 import time
 import urllib
-from dotenv import dotenv_values, load_dotenv
 import json
 import os
 import datetime
 import uuid
+from main import load_config
 from pyspark.sql.functions import lit
 
 __author__ = 'gaurav'
 
-def load_config():
-    cwd = os.getcwd()
-    path_config_env = os.path.join(cwd, "config", "fetch_from_mongo", "config.env")
-    path_config_json = os.path.join(cwd, "config", "fetch_from_mongo", "config.json")
-
-    load_dotenv(str(path_config_env))
-    MONGO_USER_NAME = os.getenv('MONGO_USER_NAME')
-    MONGO_USER_PWD = os.getenv('MONGO_USER_PWD')
-
-    with open(str(path_config_json)) as f:
-        config = json.load(f)
-
-    config.update({
-        'MONGO_USER_NAME': MONGO_USER_NAME,
-        'MONGO_USER_PWD': MONGO_USER_PWD
-    })
-    return config
-
 #==================================== Remote connection setting =======================
 def prepare_db_uri(config):
-
+    read_con = config.get('read_config', None)
     username = urllib.parse.quote_plus(config.get('MONGO_USER_NAME'))
     pwd = urllib.parse.quote_plus(config.get('MONGO_USER_PWD'))
-    database = config.get('database_config', {}).get('db_name', None)
-    collection = config.get('database_config', {}).get('collection')
-    host = config.get('database_config', {}).get('db_host', None)
+    database = read_con.get('data', {}).get('db_name', None)
+    collection = read_con.get('data', {}).get('collection')
+    host = read_con.get('data', {}).get('db_host', None)
     input_uri = "mongodb://{}/{}".format(host, database)
     return input_uri
 #======================================================================================
@@ -97,7 +79,7 @@ class CheckpointInfo:
         self.query_params['end_dt'] = old_end_time + datetime.timedelta(seconds=24*60*60)
         return self
 
-    def update_in_db(self, spark):
+    def update_in_db(self,spark,config):
         print('## Updating checkpoint in DB\n{}'.format(self))
         schema = StructType([
             StructField("source", StringType(), True),
@@ -117,14 +99,23 @@ class CheckpointInfo:
             'run_status': self.run_status,
             'source_query_param': json.dumps(self.query_params, default=str)
         }
+        write_con = config.get('write_config',{})
+        db_host = write_con.get('checkpoint',{}).get('db_host',None)
+        database = write_con.get('checkpoint', {}).get('database',None)
+        schem = write_con.get('checkpoint',{}).get('schema',None)
+        table = write_con.get('checkpoint',{}).get('table',None)
+        usern = write_con.get('checkpoint',{}).get('username',None)
+        pwd = write_con.get('checkpoint',{}).get('password',None)
+        driver = write_con.get('checkpoint',{}).get('driver',None)
+        
         df = spark.createDataFrame([data], schema=schema)
         df.write.format('jdbc')\
             .options(
-                url='jdbc:postgresql://localhost:5432/Migration_Catalogue',
-                dbtable='migration_checkpoints."Checkpoint"',
-                user='postgres',
-                password='postgres',
-                driver='org.postgresql.Driver'
+                url='jdbc:postgresql://{}/{}'.format(db_host,database),
+                dbtable='{}."{}"'.format(schem,table),
+                user='{}'.format(usern),
+                password='{}'.format(pwd),
+                driver='{}'.format(driver)
         ).mode('append').save()
         
         return
@@ -140,15 +131,24 @@ class CheckpointInfo:
             Query Param: {self.query_params}
         '''
 
-def read_last_checkpoint_info(spark):
+def read_last_checkpoint_info(spark, config):
     print('## Reading last checkpoint ##')
+    read_con = config.get('read_config',{})
+    db_host = read_con.get('checkpoint',{}).get('db_host',None)
+    database = read_con.get('checkpoint',{}).get('database',None)
+    schema = read_con.get('checkpoint',{}).get('schema',None)
+    table = read_con.get('checkpoint',{}).get('table',None)
+    usern = read_con.get('checkpoint',{}).get('username',None)
+    pwd = read_con.get('checkpoint',{}).get('password',None)
+    driver = read_con.get('checkpoint',{}).get('driver',None)
+    
     jdbcDF2 = spark.read.format("jdbc").\
         options(
-            url='jdbc:postgresql://localhost:5432/Migration_Catalogue',
-            query='select * from migration_checkpoints."Checkpoint" where run_status=\'SUCCESS\' order by run_started_at desc NULLS LAST limit 1',
-            user='postgres',
-            password='postgres',
-            driver='org.postgresql.Driver').\
+            url='jdbc:postgresql://{}/{}'.format(db_host,database),
+            query='select * from {}."{}" where run_status=\'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table),
+            user='{}'.format(usern),
+            password='{}'.format(pwd),
+            driver='{}'.format(driver)).\
         load()
     jdbcDF2.show()
     l_checkpoint_info = jdbcDF2.collect()[0]
@@ -180,10 +180,10 @@ def prepare_checkpoint_info(l_ckpt_info, run_info, spark, curr_ckpt_info=Checkpo
 def read_data_from_source(ckpt_info, config, spark):
     print('####\n\n {}'.format(config))
     input_uri = config.get('input_uri')
-    database_config = config.get('database_config', {})
-    database = database_config.get('db_name')
-    collection = database_config.get('collection')
-    checkpoint = database_config.get('checkpoint_info')
+    read_con = config.get('read_config', None) 
+    database = read_con.get('data',{}).get('db_name')   
+    collection = read_con.get('data',{}).get('collection')
+    checkpoint = read_con.get('checkpoint_info')
 
     # convert your date string to datetime object
     start = ckpt_info.query_params['start_dt']
@@ -238,24 +238,24 @@ def prepare_run_info():
     }
     return run_info
 
-def analyze(spark, sc):
+def analyze(spark, sc, config):
     # Prepare meta-data.
     print('## Loading configuration ##')
-    config = load_config()
     input_uri = prepare_db_uri(config)
     config.update({'input_uri': input_uri})
-    sink_folder = config.get('sink', {}).get('folder', None)
+    write_con = config.get('write_config',None)
+    sink_folder = write_con.get('data', {}).get('folder', None)
     sink_options = {'sink_folder': sink_folder}
     run_info = prepare_run_info()
     curr_ckpt_info = CheckpointInfo()
     print("Source to Sink: {} --> {}".format(input_uri, sink_folder))
     try:
-        l_ckpt_info = read_last_checkpoint_info(spark)
+        l_ckpt_info = read_last_checkpoint_info(spark, config)
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
                                                             curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'
-        curr_ckpt_info.update_in_db(spark)
+        curr_ckpt_info.update_in_db(spark,config)
         # TODO: Do your task here.
         print('Fetching full load data from Mongo')
         df = read_data_from_source(curr_ckpt_info, config, spark)
@@ -275,6 +275,6 @@ def analyze(spark, sc):
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.datetime.now()
-        curr_ckpt_info.update_in_db(spark)
+        curr_ckpt_info.update_in_db(spark,config)
     print("xxxxxxxxxx Exiting from script xxxxxxxxxxxxx")
     return 
