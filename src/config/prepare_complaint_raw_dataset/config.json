@@ -1,0 +1,39 @@
+{
+    "read_config": {
+        "checkpoint": {
+            "store_name": "POSTGRES",
+            "username": "postgres",
+            "password": "postgres",
+            "database" : "Migration_Catalogue",
+            "schema": "migration_checkpoints",
+            "table": "Checkpoint",
+            "driver" : "org.postgresql.Driver",
+            "db_host": "localhost:5432"
+        },
+        "data": {
+            "store_name": "HDFS",
+            "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datastore"
+        }
+    },
+    "write_config": {
+        "checkpoint": {
+            "store_name": "POSTGRES",
+            "username" :"postgres",
+            "password" :"postgres",
+            "database" : "Migration_Catalogue",
+            "schema" :"migration_checkpoints",
+            "table" :"Checkpoint",
+            "driver" : "org.postgresql.Driver",
+            "db_host" :"localhost:5432"
+    },
+    "data": {
+        "store_name": "HDFS",    
+        "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datasets"
+        }
+    },
+    "spark_conf": {
+        "spark.appName": "prepare_complaint_raw_dataset"
+    }
+
+}    
+
