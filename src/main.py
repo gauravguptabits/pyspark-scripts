@@ -37,13 +37,13 @@ except:
     findspark.init()
     import pyspark
 from pyspark.sql import SparkSession
+import numpy
 
 __author__ = 'Impressico'
 
 
-def load_config():
+def load_config(job_name):
     cwd = os.getcwd()
-    job_name = 'fetch_from_mongo'
     path_config_env = os.path.join(cwd, "config", job_name, "config.env")
     path_config_json = os.path.join(cwd, "config", job_name, "config.json")
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logger.info("Called with arguments: %s" % args)
     # TODO: Load config here.
-    config = load_config()
+    config = load_config(args.job_name)
 
     environment = {
         'PYSPARK_JOB_ARGS': ' '.join(args.job_args) if args.job_args else ''
