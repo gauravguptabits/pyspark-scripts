@@ -13,7 +13,11 @@ import logging
 
 __author__ = 'gaurav'
 
-logger = logging.getLogger()
+# logger = logging.getLogger()
+spark = SparkSession.builder.getOrCreate()
+sc = spark.sparkContext
+log4jLogger = sc._jvm.org.apache.log4j
+logger = log4jLogger.LogManager.getLogger(__name__)
 
 #==================================== Remote connection setting =======================
 def prepare_db_uri(config):
@@ -244,6 +248,7 @@ def prepare_run_info():
 def analyze(spark, sc, config):
     # Prepare meta-data.
     logger.info('## Loading configuration ##')
+    logger.warn('## Loading configuration ##')
     input_uri = prepare_db_uri(config)
     config.update({'input_uri': input_uri})
     write_con = config.get('write_config',None)

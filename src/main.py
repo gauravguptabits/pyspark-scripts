@@ -6,17 +6,9 @@ import os
 import sys
 from dotenv import dotenv_values, load_dotenv
 import json 
-import logging
+#import logging
 import logger
-import logging.handlers
-
-logger = logging.getLogger()
-
-handler = logging.FileHandler("logs.log",mode='a')
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
+from pyspark import SparkContext
 
 
 if os.path.exists('libs.zip'):
@@ -66,7 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--job-args', nargs='*', help="Extra arguments to send to the PySpark job (example: --job-args template=manual-email1 foo=bar")
 
     args = parser.parse_args()
-    logger.info("Called with arguments: %s" % args)
+    print("Called with arguments: %s" % args)
     # TODO: Load config here.
     config = load_config(args.job_name)
 
@@ -80,7 +72,7 @@ if __name__ == '__main__':
         logger.info('job_args_tuples: %s' % job_args_tuples)
         job_args = {a[0]: a[1] for a in job_args_tuples}
 
-    logger.info('\nRunning job %s...\nenvironment is %s\n' % (args.job_name, environment))
+    print('\nRunning job %s...\nenvironment is %s\n' % (args.job_name, environment))
 
     # TODO: supply Spark config while creating spark object.
     os.environ.update(environment)
@@ -90,12 +82,18 @@ if __name__ == '__main__':
     for k,v in sparkcon.items():
         sparkBuilder = sparkBuilder.config(k,v)
     spark = sparkBuilder.getOrCreate()
-    sc = spark.sparkContext.setLogLevel("WARN") 
+    sc = spark.sparkContext
+    
+    log4jLogger = sc._jvm.org.apache.log4j
+    log = log4jLogger.LogManager.getLogger(__name__)
+    log.info('Setting log level to WARNING NOW.')
+    level = sc.setLogLevel("WARN")
+    log.warn('First log after warning.')
+    
     job_module = importlib.import_module('jobs.%s' % args.job_name)
-
     start = time.time()
     # TODO: Supply Config to the job as argument.
     job_module.analyze(spark, sc, config, **job_args)
     end = time.time()
 
-    logger.info("\nExecution of job %s took %s seconds" % (args.job_name, end-start))
+    log.error("\nExecution of job %s took %s seconds" % (args.job_name, end-start))
