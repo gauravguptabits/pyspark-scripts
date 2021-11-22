@@ -35,6 +35,7 @@ class CheckpointInfo:
         self.run_started_at = None
         self.run_status = None
         self.run_end_at = None
+        self.brand = None
     
     def generate_end_dt(self, duration_in_secs = 0):
         self.end_dt = self.start_dt + timedelta(seconds=duration_in_secs)
@@ -45,13 +46,18 @@ class CheckpointInfo:
         self.run_started_at = run_info.get('run_started_at', None)
         self.run_end_at = run_info.get('run_end_at', None)
         return self
+    
+    def update_brand_name(self,brand_name):
+        self.brand = brand_name
+        return self
+    
     def update_query_params(self, old_ckpt):
         old_end_time = old_ckpt.query_params.get('end_dt', None)
         if not old_end_time:
             raise ValueError('Insufficient argument: end_dt must be present.')
 
         self.query_params['start_dt'] = old_end_time
-        self.query_params['end_dt'] = old_end_time + timedelta(days=4)
+        self.query_params['end_dt'] = old_end_time + timedelta(days=1)
         return self
     
 
@@ -62,15 +68,17 @@ class CheckpointInfo:
             StructField("run_id", StringType(), True),
             StructField("run_end_at", StringType(), True),
             StructField("run_status", StringType(), True),
+            StructField("brand", StringType(), True),
             StructField("source_query_param", StringType(), True)
-            ])
+        ])
         data = {
             'run_started_at': self.run_started_at.isoformat(),
             'run_end_at': self.run_end_at and self.run_end_at.isoformat(),
             'run_id': str(self.run_id),
             'run_status': self.run_status,
+            'brand' : self.brand,
             'source_query_param': json.dumps(self.query_params, default=str)
-            }
+        }
         db_host = glom(config, 'write_config.checkpoint.db_host')
         database = glom(config, 'write_config.checkpoint.database')
         schem = glom(config, 'write_config.checkpoint.schema')
@@ -97,6 +105,7 @@ class CheckpointInfo:
             Run End: {self.run_end_at}
             Run Status: {self.run_status}
             Query Param: {self.query_params}
+            Brand: {self.brand}
         '''
         
 def read_last_checkpoint_info(spark, config):
@@ -108,11 +117,11 @@ def read_last_checkpoint_info(spark, config):
     usern =  glom(config, 'read_config.checkpoint.username')
     pwd = glom(config, 'read_config.checkpoint.password')
     driver = glom(config, 'read_config.checkpoint.driver')
-    brand = glom(config,'partition_info.brand')
+    brands = glom(config,'partition_info.brand')
     jdbcDF2 = spark.read.format("jdbc").\
         options(
             url='jdbc:postgresql://{}/{}'.format(db_host,database),
-            query='select * from {}."{}" where run_status=\'SUCCESS\' and brand =\'{}\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,brand),
+            query='select * from {}."{}" where run_status=\'SUCCESS\' and brand = \'{}\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,brands),
             user='{}'.format(usern),
             password='{}'.format(pwd),
             driver='{}'.format(driver)).\
@@ -132,13 +141,15 @@ def read_last_checkpoint_info(spark, config):
     l_ckpt.run_end_at = datetime.fromisoformat(l_checkpoint_info.run_end_at)
     l_ckpt.run_started_at = datetime.fromisoformat(l_checkpoint_info.run_started_at)
     l_ckpt.run_status = l_checkpoint_info.run_status
+    l_ckpt.brand = l_checkpoint_info.brand
     logger.info('## Last successful checkpoint details\n{}'.format(l_ckpt))
     return l_ckpt
 
-def prepare_checkpoint_info(l_ckpt_info, run_info, spark, curr_ckpt_info=CheckpointInfo(),):
+def prepare_checkpoint_info(l_ckpt_info, run_info, spark,config,curr_ckpt_info=CheckpointInfo(),):
     logger.info('## Preparing current checkpoint object.')
     curr_ckpt_info.update_query_params(l_ckpt_info)
     curr_ckpt_info.update_run_info(run_info)
+    curr_ckpt_info.update_brand_name(config)
     return l_ckpt_info, curr_ckpt_info
 
 def prepare_run_info():
@@ -148,6 +159,9 @@ def prepare_run_info():
         'run_end_at': None
     }
     return run_info
+def prepare_brand_name(config):
+    brand_name = glom(config,'partition_info.brand')
+    return brand_name
 def _generate_part_file_location(curated_partition_info):
     keys = list(curated_partition_info.keys())
     vals = [curated_partition_info.get(k) for k in keys]
@@ -215,6 +229,7 @@ def analyze(spark, sc, config):
     '''
     
     run_info = prepare_run_info()
+    brand_name = prepare_brand_name(config)
     curr_ckpt_info = CheckpointInfo()
 
     try:
@@ -223,7 +238,7 @@ def analyze(spark, sc, config):
        
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
-                                                            curr_ckpt_info)
+                                                            brand_name,curr_ckpt_info)
         
         file_paths = _generate_part_files_location(config,curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'

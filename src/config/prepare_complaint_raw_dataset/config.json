@@ -6,7 +6,7 @@
             "password": "postgres",
             "database" : "Migration_Catalogue",
             "schema": "migration_checkpoints",
-            "table": "Checkpoint_2",
+            "table": "Checkpoint",
             "driver" : "org.postgresql.Driver",
             "db_host": "localhost:5432"
         },
@@ -22,7 +22,7 @@
             "password" :"postgres",
             "database" : "Migration_Catalogue",
             "schema" :"migration_checkpoints",
-            "table" :"Checkpoint_2",
+            "table" :"Checkpoint",
             "driver" : "org.postgresql.Driver",
             "db_host" :"localhost:5432"
     },
