@@ -12,7 +12,7 @@
         },
         "data": {
             "store_name": "HDFS",
-            "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datastore"
+            "folder": "/home/simran.tyagi/pyspark-scripts/data/datastore"
         }
     },
     "write_config": {
@@ -28,11 +28,15 @@
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datasets"
+        "folder": "/home/simran.tyagi/pyspark-scripts/data/datasets"
         }
     },
     "spark_conf": {
         "spark.appName": "prepare_complaint_raw_dataset"
+    },
+    "partition_info" :{
+        "category": "Consumer Electronics",  
+        "brand" : "Amazon"
     }
 
 }    
