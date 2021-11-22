@@ -6,13 +6,13 @@
             "password": "postgres",
             "database" : "Migration_Catalogue",
             "schema": "migration_checkpoints",
-            "table": "Checkpoint",
+            "table": "Checkpoint_2",
             "driver" : "org.postgresql.Driver",
             "db_host": "localhost:5432"
         },
         "data": {
             "store_name": "HDFS",
-            "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datastore"
+            "folder": "/home/simran.tyagi/pyspark-scripts/data/datastore"
         }
     },
     "write_config": {
@@ -22,17 +22,21 @@
             "password" :"postgres",
             "database" : "Migration_Catalogue",
             "schema" :"migration_checkpoints",
-            "table" :"Checkpoint",
+            "table" :"Checkpoint_2",
             "driver" : "org.postgresql.Driver",
             "db_host" :"localhost:5432"
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/datasets"
+        "folder": "/home/simran.tyagi/pyspark-scripts/data/datasets"
         }
     },
     "spark_conf": {
         "spark.appName": "prepare_complaint_raw_dataset"
+    },
+    "partition_info" :{
+        "category": "Consumer Electronics",  
+        "brand" : "Amazon"
     }
 
 }    
