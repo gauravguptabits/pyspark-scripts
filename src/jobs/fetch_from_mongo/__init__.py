@@ -9,8 +9,15 @@ import datetime
 import uuid
 from main import load_config
 from pyspark.sql.functions import lit
+import logging
 
 __author__ = 'gaurav'
+
+# logger = logging.getLogger()
+spark = SparkSession.builder.getOrCreate()
+sc = spark.sparkContext
+log4jLogger = sc._jvm.org.apache.log4j
+logger = log4jLogger.LogManager.getLogger(__name__)
 
 #==================================== Remote connection setting =======================
 def prepare_db_uri(config):
@@ -80,7 +87,7 @@ class CheckpointInfo:
         return self
 
     def update_in_db(self,spark,config):
-        print('## Updating checkpoint in DB\n{}'.format(self))
+        logger.info('## Updating checkpoint in DB\n{}'.format(self))
         schema = StructType([
             StructField("source", StringType(), True),
             StructField("sink", StringType(), True),
@@ -132,7 +139,7 @@ class CheckpointInfo:
         '''
 
 def read_last_checkpoint_info(spark, config):
-    print('## Reading last checkpoint ##')
+    logger.info('## Reading last checkpoint ##')
     read_con = config.get('read_config',{})
     db_host = read_con.get('checkpoint',{}).get('db_host',None)
     database = read_con.get('checkpoint',{}).get('database',None)
@@ -167,18 +174,18 @@ def read_last_checkpoint_info(spark, config):
     l_ckpt.run_end_at = datetime.datetime.fromisoformat(l_checkpoint_info.run_end_at)
     l_ckpt.run_started_at = datetime.datetime.fromisoformat(l_checkpoint_info.run_started_at)
     l_ckpt.run_status = l_checkpoint_info.run_status
-    print('## Last successful checkpoint details\n{}'.format(l_ckpt))
+    logger.info('## Last successful checkpoint details\n{}'.format(l_ckpt))
     return l_ckpt
 
 
 def prepare_checkpoint_info(l_ckpt_info, run_info, spark, curr_ckpt_info=CheckpointInfo(),):
-    print('## Preparing current checkpoint object.')
+    logger.info('## Preparing current checkpoint object.')
     curr_ckpt_info.update_query_params(l_ckpt_info)
     curr_ckpt_info.update_run_info(run_info)
     return l_ckpt_info, curr_ckpt_info
 
 def read_data_from_source(ckpt_info, config, spark):
-    print('####\n\n {}'.format(config))
+    logger.info('####\n\n {}'.format(config))
     input_uri = config.get('input_uri')
     read_con = config.get('read_config', None) 
     database = read_con.get('data',{}).get('db_name')   
@@ -200,7 +207,7 @@ def read_data_from_source(ckpt_info, config, spark):
             }
         }
     }]
-    print('#####Mongo Query####\n\n\n{}\n\n'.format(agg_query))
+    logger.info('#####Mongo Query####\n\n\n{}\n\n'.format(agg_query))
     df = spark.read.format("mongo")\
             .option("uri", input_uri)\
             .option("database", database)\
@@ -240,7 +247,8 @@ def prepare_run_info():
 
 def analyze(spark, sc, config):
     # Prepare meta-data.
-    print('## Loading configuration ##')
+    logger.info('## Loading configuration ##')
+    logger.warn('## Loading configuration ##')
     input_uri = prepare_db_uri(config)
     config.update({'input_uri': input_uri})
     write_con = config.get('write_config',None)
@@ -248,7 +256,7 @@ def analyze(spark, sc, config):
     sink_options = {'sink_folder': sink_folder}
     run_info = prepare_run_info()
     curr_ckpt_info = CheckpointInfo()
-    print("Source to Sink: {} --> {}".format(input_uri, sink_folder))
+    logger.info("Source to Sink: {} --> {}".format(input_uri, sink_folder))
     try:
         l_ckpt_info = read_last_checkpoint_info(spark, config)
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
@@ -257,7 +265,7 @@ def analyze(spark, sc, config):
         curr_ckpt_info.run_status = 'RUNNING'
         curr_ckpt_info.update_in_db(spark,config)
         # TODO: Do your task here.
-        print('Fetching full load data from Mongo')
+        logger.info('Fetching full load data from Mongo')
         df = read_data_from_source(curr_ckpt_info, config, spark)
         # count = df.count()
         # print('## Number of records to copy - {}'.format(count))
@@ -266,15 +274,15 @@ def analyze(spark, sc, config):
         copy_data_to_sink(df, sink_options, curr_ckpt_info)
         run_info['run_end_at'] = datetime.datetime.now()
         curr_ckpt_info.update_run_info(run_info)
-        print('## Printing dataframe sample.')
+        logger.info('## Printing dataframe sample.')
         df.show(5)
         curr_ckpt_info.run_status = 'SUCCESS'
     except Exception as e:
         # TODO: Ensure copying wasn't done. If it did, then rollback.
-        print(e)
+        logger.error(e)
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.datetime.now()
         curr_ckpt_info.update_in_db(spark,config)
-    print("xxxxxxxxxx Exiting from script xxxxxxxxxxxxx")
+    logger.info("xxxxxxxxxx Exiting from script xxxxxxxxxxxxx")
     return 
