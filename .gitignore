@@ -2,5 +2,6 @@ dist/
 data/
 .vscode
 src/libs/
-src/noteboooks/.ipynb_checkpoints/
+noteboooks
+noteboooks/.ipynb_checkpoints/
 
