@@ -36,7 +36,8 @@
     },
     "partition_info" :{
         "category": "Consumer Electronics",  
-        "brand" : "Amazon"
+        "brand" : "Amazon",
+        "task_type" :"prepare_complaint_data"
     }
 
 }    
