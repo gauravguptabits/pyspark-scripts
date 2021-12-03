@@ -17,7 +17,7 @@ import json
 import urllib
 from pathlib import *
 from requests.utils import requote_uri
-from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_brand_name,prepare_task_type
+from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
 
 __author__ = 'gaurav'
 
@@ -40,8 +40,8 @@ def _generate_part_files_location(config,ckpt_info):
     from_dt= ckpt_info.query_params['start_dt']
     till_dt= ckpt_info.query_params['end_dt']
 
-    #dates = ['2021-10-23','2021-10-24','2021-10-25']
-    dates = list(pd.date_range(from_dt, till_dt).strftime('%Y-%m-%d'))
+    dates = ['2021-10-24','2021-10-25']
+    #dates = list(pd.date_range(from_dt, till_dt).strftime('%Y-%m-%d'))
          
     c = glom(config,'partition_info.category')
     b = glom(config,'partition_info.brand')
@@ -53,17 +53,10 @@ def _generate_part_files_location(config,ckpt_info):
     return(abs_file_paths)
 
 
-#def path_exists(path):
-    fs = sc._jvm.org.apache.hadoop.fs.FileSystem.get(sc._jsc.hadoopConfiguration())
-    status = fs.globStatus(Path('path'))
-
-    return fs.exists(sc._jvm.org.apache.hadoop.fs.Path(path))  
- 
-
 def read_data_part(spark, path):
     # Reading data from partition
     print('#### \n\nReading from path - \n\n\n{}'.format(path))
-    df = spark.read.option("header", "true").load(path)
+    df = spark.read.option("header", "true").json(path)
     return df
 
     
@@ -102,7 +95,6 @@ def analyze(spark, sc, config):
     '''
     
     run_info = prepare_run_info()
-    brand_name = prepare_brand_name(config)
     task_type = prepare_task_type(config)
     curr_ckpt_info = CheckpointInfo()
 
@@ -112,7 +104,7 @@ def analyze(spark, sc, config):
        
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
-                                                            brand_name,task_type,curr_ckpt_info)
+                                                            task_type,curr_ckpt_info)
         
         file_paths = _generate_part_files_location(config,curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'
@@ -122,16 +114,13 @@ def analyze(spark, sc, config):
         write_to_sink(df,config)
         run_info['run_end_at'] = datetime.now()
         curr_ckpt_info.update_run_info(run_info)
-        curr_ckpt_info.update_brand_name(brand_name)
-        curr_ckpt_info.update_task_name(task_type)
         df.show()
         curr_ckpt_info.run_status = 'SUCCESS'
  
     except Exception as e:
-        logger.error(e)
+        print(e)
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.now()
         curr_ckpt_info.update_in_db(spark,config)               
     return
-
