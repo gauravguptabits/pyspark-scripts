@@ -4,4 +4,4 @@ data/
 src/libs/
 noteboooks
 noteboooks/.ipynb_checkpoints/
-
+tmp.sh
