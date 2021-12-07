@@ -15,7 +15,9 @@ import pandas as pd
 import json
 import urllib
 from pathlib import *
+from jobs.prepare_complaint_raw_dataset.__init__ import prepare_query
 from requests.utils import requote_uri
+
 spark = SparkSession.builder.getOrCreate()
 sc = spark.sparkContext
 log4jLogger = sc._jvm.org.apache.log4j
@@ -33,6 +35,8 @@ class CheckpointInfo:
         self.run_status = None
         self.run_end_at = None
         self.task_type = None
+        self.source ='Hdfs'
+        self.sink = 'Hdfs'
     
     def generate_end_dt(self, duration_in_secs = 0):
         self.end_dt = self.start_dt + timedelta(seconds=duration_in_secs)
@@ -47,7 +51,7 @@ class CheckpointInfo:
     def update_task_type(self,task_type):
         self.task_type = task_type
         return self
-           
+      
     def update_query_params(self, old_ckpt):
         old_end_time = old_ckpt.query_params.get('end_dt', None)
         if not old_end_time:
@@ -59,7 +63,7 @@ class CheckpointInfo:
         brands = old_ckpt.query_params.get('brand',None)
         self.query_params['brand']= brands
         return self
-
+    
     def update_in_db(self,spark,config):
         print('## Updating checkpoint in DB\n{}'.format(self))
         schema = StructType([
@@ -68,7 +72,9 @@ class CheckpointInfo:
             StructField("run_end_at", StringType(), True),
             StructField("run_status", StringType(), True),
             StructField("task_type", StringType(), True),
-            StructField("source_query_param", StringType(), True)
+            StructField("source_query_param", StringType(), True),
+            StructField("source", StringType(), True),
+            StructField("sink", StringType(), True)
         ])
         data = {
             'run_started_at': self.run_started_at.isoformat(),
@@ -76,7 +82,9 @@ class CheckpointInfo:
             'run_id': str(self.run_id),
             'run_status': self.run_status,
             'task_type' : self.task_type,
-            'source_query_param': json.dumps(self.query_params, default=str)
+            'source_query_param': json.dumps(self.query_params, default=str),
+            'source': self.source,
+            'sink': self.sink
         }
         db_host = glom(config, 'write_config.checkpoint.db_host')
         database = glom(config, 'write_config.checkpoint.database')
@@ -86,8 +94,6 @@ class CheckpointInfo:
         pwd =  glom(config, 'write_config.checkpoint.password')
         driver= glom(config, 'write_config.checkpoint.driver')
         df = spark.createDataFrame([data], schema=schema)
-        
-        df = spark.createDataFrame([data], schema=schema)
         df.write.format('jdbc')\
             .options(
                 url='jdbc:postgresql://{}/{}'.format(db_host,database),
@@ -96,7 +102,6 @@ class CheckpointInfo:
                 password='{}'.format(pwd),
                 driver='{}'.format(driver)
         ).mode('append').save()
-        
         return
     
     def __str__(self):
@@ -107,19 +112,10 @@ class CheckpointInfo:
             Run Status: {self.run_status}
             Task Type:{self.task_type}
             Query Param: {self.query_params}
-            Input Param:{self.input_param}
-
+            Source: {self.source}
+            Sink:{self.sink}
         '''
-def prepare_query(config):
-    schema =  glom(config, 'read_config.checkpoint.schema')
-    table =  glom(config, 'read_config.checkpoint.table')
-    brands = glom(config,'partition_info.brand')
-    task = glom(config,'partition_info.task_type')
-    if task == 'prepare_complaint_data':
-        query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' and source_query_param:: json->>\'brand\' =\'{}\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task,brands)
-    else:
-        query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task)
-    return query
+
 
 def read_last_checkpoint_info(spark, config):
     logger.info('## Reading last checkpoint ##')
@@ -155,6 +151,8 @@ def read_last_checkpoint_info(spark, config):
     l_ckpt.run_started_at = datetime.fromisoformat(l_checkpoint_info.run_started_at)
     l_ckpt.run_status = l_checkpoint_info.run_status
     l_ckpt.task_type = l_checkpoint_info.task_type
+    l_ckpt.source = l_checkpoint_info.source
+    l_ckpt.sink = l_checkpoint_info.sink
     logger.info('## Last successful checkpoint details\n{}'.format(l_ckpt))
     return l_ckpt
 

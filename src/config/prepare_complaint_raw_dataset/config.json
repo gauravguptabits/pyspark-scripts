@@ -32,7 +32,9 @@
         }
     },
     "spark_conf": {
-        "spark.appName": "prepare_complaint_raw_dataset"
+        "spark.appName": "prepare_complaint_raw_dataset",
+        "spark.executor.memory": "2g",
+        "spark.executor.cores": "2"
     },
     "partition_info" :{
         "category": "Consumer Electronics",  
