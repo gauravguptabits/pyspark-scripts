@@ -9,8 +9,8 @@ import datetime
 import uuid
 from main import load_config
 from pyspark.sql.functions import lit
-import logging
-
+from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info
+import glom
 __author__ = 'gaurav'
 
 # logger = logging.getLogger()
@@ -50,139 +50,13 @@ def prepare_db_uri(config):
 #     load()
 
 
-class CheckpointInfo:
-    def __init__(self):
-        self.query_params = {
-            'start_dt': None,
-            'end_dt': None
-        }
-        self.source = 'MONGO'
-        self.sink = 'HDFS'
-        self.run_id = None
-        self.run_started_at = None
-        self.run_status = None
-        self.run_end_at = None
-    
-    def generate_end_dt(self, duration_in_secs = 0):
-        self.end_dt = self.start_dt + datetime.timedelta(seconds=duration_in_secs)
-        return self.end_dt
-    
-    def update_run_info(self, run_info):
-        self.run_id = run_info.get('run_id', None)
-        self.run_started_at = run_info.get('run_started_at', None)
-        self.run_end_at = run_info.get('run_end_at', None)
-        return self
-    
-    def update_query_params(self, old_ckpt):
-        # old_ckpt.query_params = {
-        #     'end_dt': datetime.datetime.fromisoformat("2021-10-20T00:00:00.000000")
-        # }
-        old_end_time = old_ckpt.query_params.get('end_dt', None)
-        if not old_end_time:
-            raise ValueError('Insufficient argument: end_dt must be present.')
+def prepare_query(config):
+    schema =  glom(config, 'read_config.checkpoint.schema')
+    table =  glom(config, 'read_config.checkpoint.table')
+    task = glom(config,'partition_info.task_type')
+    query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task)
+    return query
 
-        self.query_params['start_dt'] = old_end_time
-        # 1 day long job
-        self.query_params['end_dt'] = old_end_time + datetime.timedelta(seconds=24*60*60)
-        return self
-
-    def update_in_db(self,spark,config):
-        logger.info('## Updating checkpoint in DB\n{}'.format(self))
-        schema = StructType([
-            StructField("source", StringType(), True),
-            StructField("sink", StringType(), True),
-            StructField("run_started_at", StringType(), True),
-            StructField("run_id", StringType(), True),
-            StructField("run_end_at", StringType(), True),
-            StructField("run_status", StringType(), True),
-            StructField("source_query_param", StringType(), True)
-        ])
-        data = {
-            'source': self.source,
-            'sink': self.sink,
-            'run_started_at': self.run_started_at.isoformat(),
-            'run_end_at': self.run_end_at and self.run_end_at.isoformat(),
-            'run_id': str(self.run_id),
-            'run_status': self.run_status,
-            'source_query_param': json.dumps(self.query_params, default=str)
-        }
-        write_con = config.get('write_config',{})
-        db_host = write_con.get('checkpoint',{}).get('db_host',None)
-        database = write_con.get('checkpoint', {}).get('database',None)
-        schem = write_con.get('checkpoint',{}).get('schema',None)
-        table = write_con.get('checkpoint',{}).get('table',None)
-        usern = write_con.get('checkpoint',{}).get('username',None)
-        pwd = write_con.get('checkpoint',{}).get('password',None)
-        driver = write_con.get('checkpoint',{}).get('driver',None)
-        
-        df = spark.createDataFrame([data], schema=schema)
-        df.write.format('jdbc')\
-            .options(
-                url='jdbc:postgresql://{}/{}'.format(db_host,database),
-                dbtable='{}."{}"'.format(schem,table),
-                user='{}'.format(usern),
-                password='{}'.format(pwd),
-                driver='{}'.format(driver)
-        ).mode('append').save()
-        
-        return
-    
-    def __str__(self):
-        return f'''
-            Source:{self.source}
-            Sink:{self.sink}
-            Run ID:{self.run_id}
-            Run Start: {self.run_started_at}
-            Run End: {self.run_end_at}
-            Run Status: {self.run_status}
-            Query Param: {self.query_params}
-        '''
-
-def read_last_checkpoint_info(spark, config):
-    logger.info('## Reading last checkpoint ##')
-    read_con = config.get('read_config',{})
-    db_host = read_con.get('checkpoint',{}).get('db_host',None)
-    database = read_con.get('checkpoint',{}).get('database',None)
-    schema = read_con.get('checkpoint',{}).get('schema',None)
-    table = read_con.get('checkpoint',{}).get('table',None)
-    usern = read_con.get('checkpoint',{}).get('username',None)
-    pwd = read_con.get('checkpoint',{}).get('password',None)
-    driver = read_con.get('checkpoint',{}).get('driver',None)
-    
-    jdbcDF2 = spark.read.format("jdbc").\
-        options(
-            url='jdbc:postgresql://{}/{}'.format(db_host,database),
-            query='select * from {}."{}" where run_status=\'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table),
-            user='{}'.format(usern),
-            password='{}'.format(pwd),
-            driver='{}'.format(driver)).\
-        load()
-    jdbcDF2.show()
-    l_checkpoint_info = jdbcDF2.collect()[0]
-    # convert to checkpoint
-    l_ckpt = CheckpointInfo()
-    l_ckpt.source = l_checkpoint_info.source
-    l_ckpt.sink = l_checkpoint_info.sink
-    l_ckpt.query_params = json.loads(l_checkpoint_info.source_query_param)
-    start_dt = l_ckpt.query_params['start_dt']
-    end_dt = l_ckpt.query_params['end_dt']
-
-    l_ckpt.query_params['start_dt'] = datetime.datetime.fromisoformat(start_dt)
-    l_ckpt.query_params['end_dt'] = datetime.datetime.fromisoformat(end_dt)
-
-    l_ckpt.run_id = l_checkpoint_info.run_id
-    l_ckpt.run_end_at = datetime.datetime.fromisoformat(l_checkpoint_info.run_end_at)
-    l_ckpt.run_started_at = datetime.datetime.fromisoformat(l_checkpoint_info.run_started_at)
-    l_ckpt.run_status = l_checkpoint_info.run_status
-    logger.info('## Last successful checkpoint details\n{}'.format(l_ckpt))
-    return l_ckpt
-
-
-def prepare_checkpoint_info(l_ckpt_info, run_info, spark, curr_ckpt_info=CheckpointInfo(),):
-    logger.info('## Preparing current checkpoint object.')
-    curr_ckpt_info.update_query_params(l_ckpt_info)
-    curr_ckpt_info.update_run_info(run_info)
-    return l_ckpt_info, curr_ckpt_info
 
 def read_data_from_source(ckpt_info, config, spark):
     logger.info('####\n\n {}'.format(config))
@@ -237,14 +111,6 @@ def copy_data_to_sink(df, sink_options, curr_ckpt_info):
         .json(sink_folder)
     return df
 
-def prepare_run_info():
-    run_info = {
-        'run_id': uuid.uuid1(),
-        'run_started_at': datetime.datetime.now(),
-        'run_end_at': None
-    }
-    return run_info
-
 def analyze(spark, sc, config):
     # Prepare meta-data.
     logger.info('## Loading configuration ##')
@@ -279,7 +145,7 @@ def analyze(spark, sc, config):
         curr_ckpt_info.run_status = 'SUCCESS'
     except Exception as e:
         # TODO: Ensure copying wasn't done. If it did, then rollback.
-        logger.error(e)
+        print(e)
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.datetime.now()
