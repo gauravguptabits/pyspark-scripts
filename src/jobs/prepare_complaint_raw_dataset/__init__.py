@@ -19,8 +19,8 @@ import urllib
 from pathlib import *
 from requests.utils import requote_uri
 from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
-from os import path
 import traceback
+from os import path
 __author__ = 'gaurav'
 
 spark = SparkSession.builder.getOrCreate()
@@ -51,8 +51,8 @@ def _generate_part_files_location(config,ckpt_info):
     from_dt= ckpt_info.query_params['start_dt']
     till_dt= ckpt_info.query_params['end_dt']
 
-    dates = ['2021-10-24', '2021-10-25','2021-10-26','2021-10-27']
-    #dates = list(pd.date_range(from_dt, till_dt).strftime('%Y-%m-%d'))
+    #dates = ['2021-10-24', '2021-10-25','2021-10-26','2021-10-27']
+    dates = list(pd.date_range(from_dt, till_dt).strftime('%Y-%m-%d'))
 
     c = glom(config,'partition_info.category')
     b = glom(config,'partition_info.brand')
@@ -82,7 +82,6 @@ def transform_df(df):
     df2 = df2.withColumn("source", F.lit('Twitter'))
     return df2
 def write_to_sink(df, config):
-    print("##Writing data to sink")
     folder = glom(config, 'write_config.data.folder')
     brand = glom(config, 'partition_info.brand')
     sink_folder = os.path.join(folder, brand)
@@ -108,9 +107,8 @@ def analyze(spark, sc, config):
         2. [P2] Maintain dataset version. [PARK]
     '''
     
-    run_info = prepare_run_info()
+    run_info = prepare_run_info(config)
     task_type = prepare_task_type(config)
-    #source_sink_name = prepare_source_sink(config)
     curr_ckpt_info = CheckpointInfo()
 
     try:
@@ -119,7 +117,7 @@ def analyze(spark, sc, config):
        
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, 
-                                                            task_type,
+                                                            config,task_type,
                                                             curr_ckpt_info)
 
         file_paths = _generate_part_files_location(config,curr_ckpt_info)
