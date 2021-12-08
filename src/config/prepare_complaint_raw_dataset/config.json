@@ -6,7 +6,7 @@
             "password": "postgres",
             "database" : "Migration_Catalogue",
             "schema": "migration_checkpoints",
-            "table": "Checkpoint",
+            "table": "Checkpoint_2",
             "driver" : "org.postgresql.Driver",
             "db_host": "localhost:5432"
         },
@@ -22,7 +22,7 @@
             "password" :"postgres",
             "database" : "Migration_Catalogue",
             "schema" :"migration_checkpoints",
-            "table" :"Checkpoint",
+            "table" :"Checkpoint_2",
             "driver" : "org.postgresql.Driver",
             "db_host" :"localhost:5432"
     },
@@ -32,15 +32,14 @@
         }
     },
     "spark_conf": {
-        "spark.appName": "prepare_complaint_raw_dataset",
-        "spark.executor.memory": "2g",
-        "spark.executor.cores": "2"
+        "spark.appName": "prepare_complaint_raw_dataset"
     },
     "partition_info" :{
         "category": "Consumer Electronics",  
-        "brand" : "Amazon",
+        "brand" : "Hitachi",
         "task_type" :"prepare_complaint_data"
     }
 
 }    
+
 

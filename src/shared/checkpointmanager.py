@@ -16,6 +16,7 @@ import json
 import urllib
 from pathlib import *
 from requests.utils import requote_uri
+
 spark = SparkSession.builder.getOrCreate()
 sc = spark.sparkContext
 log4jLogger = sc._jvm.org.apache.log4j
@@ -33,8 +34,8 @@ class CheckpointInfo:
         self.run_status = None
         self.run_end_at = None
         self.task_type = None
-        self.source ='Hdfs'
-        self.sink = 'Hdfs'
+        self.source =None
+        self.sink = 'HDFS'
 
     def generate_end_dt(self, duration_in_secs = 0):
         self.end_dt = self.start_dt + timedelta(seconds=duration_in_secs)
@@ -44,6 +45,7 @@ class CheckpointInfo:
         self.run_id = run_info.get('run_id', None)
         self.run_started_at = run_info.get('run_started_at', None)
         self.run_end_at = run_info.get('run_end_at', None)
+        self.source = run_info.get('source_name',None)
         return self
 
     def update_task_type(self,task_type):
@@ -110,7 +112,6 @@ class CheckpointInfo:
             Run Status: {self.run_status}
             Task Type:{self.task_type}
             Query Param: {self.query_params}
-            Input Param:{self.input_param}
             Source: {self.source}
             Sink:{self.sink}
         '''
@@ -162,15 +163,15 @@ def prepare_checkpoint_info(l_ckpt_info, run_info, spark,config,curr_ckpt_info=C
     curr_ckpt_info.update_task_type(config)
     return l_ckpt_info, curr_ckpt_info
 
-def prepare_run_info():
+def prepare_run_info(config):
     run_info = {
         'run_id': uuid.uuid1(),
         'run_started_at': datetime.now(),
-        'run_end_at': None
+        'run_end_at': None,
+        'source_name': glom(config, 'read_config.data.store_name')
     }
     return run_info
 
 def prepare_task_type(config):
-    task_name = glom(config,'partition_info.task_type')
-    return task_name
-
+    task_type=glom(config,'partition_info.task_type')
+    return task_type
