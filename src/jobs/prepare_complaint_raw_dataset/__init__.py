@@ -20,6 +20,7 @@ from pathlib import *
 from requests.utils import requote_uri
 from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
 from os import path
+import traceback
 __author__ = 'gaurav'
 
 spark = SparkSession.builder.getOrCreate()
@@ -66,9 +67,7 @@ def read_data_part(spark, path):
     # Reading data from partition
     print('#### \n\nReading from path - \n\n\n{}'.format(path))
     df = spark.read.option("header", "true").json(path)
-    return df
-
-    
+    return df    
 
 def transform_df(df):
     # user defined func to extract text field
@@ -93,6 +92,14 @@ def write_to_sink(df, config):
         .json(sink_folder)
     return    
 
+def prepare_query(config):
+    schema = glom(config, 'read_config.checkpoint.schema')
+    table = glom(config, 'read_config.checkpoint.table')
+    brands = glom(config, 'partition_info.brand')
+    task = glom(config, 'partition_info.task_type')
+    query = 'select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' and source_query_param:: json->>\'brand\' =\'{}\' order by run_started_at desc NULLS LAST limit 1'.format(
+        schema, table, task, brands)
+    return query
 
 def analyze(spark, sc, config):
     '''
@@ -107,8 +114,8 @@ def analyze(spark, sc, config):
     curr_ckpt_info = CheckpointInfo()
 
     try:
-        
-        l_ckpt_info = read_last_checkpoint_info(spark, config)
+        query = prepare_query(config)        
+        l_ckpt_info = read_last_checkpoint_info(spark, config, query)
        
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, 
@@ -130,8 +137,11 @@ def analyze(spark, sc, config):
                     curr_ckpt_info.run_status = 'SUCCESS'
                 except:
                     print("=================error")
-    except Exception as e:
-        logger.error(e)
+    except Exception as ex:
+        strace = ''.join(traceback.format_exception(etype=type(ex),
+                                                    value=ex,
+                                                    tb=ex.__traceback__))
+        logger.error(strace)
         curr_ckpt_info.run_status = 'ERROR'
         
     finally:

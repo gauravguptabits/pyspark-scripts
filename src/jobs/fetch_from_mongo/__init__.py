@@ -111,6 +111,14 @@ def copy_data_to_sink(df, sink_options, curr_ckpt_info):
         .json(sink_folder)
     return df
 
+
+def prepare_query(config):
+    schema = glom(config, 'read_config.checkpoint.schema')
+    table = glom(config, 'read_config.checkpoint.table')
+    task = glom(config, 'partition_info.task_type')
+    query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task)
+    return query
+
 def analyze(spark, sc, config):
     # Prepare meta-data.
     logger.info('## Loading configuration ##')
@@ -124,7 +132,8 @@ def analyze(spark, sc, config):
     curr_ckpt_info = CheckpointInfo()
     logger.info("Source to Sink: {} --> {}".format(input_uri, sink_folder))
     try:
-        l_ckpt_info = read_last_checkpoint_info(spark, config)
+        query = prepare_query(config)
+        l_ckpt_info = read_last_checkpoint_info(spark, config, query)
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
                                                             run_info, spark, 
                                                             curr_ckpt_info)

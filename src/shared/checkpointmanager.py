@@ -15,9 +15,7 @@ import pandas as pd
 import json
 import urllib
 from pathlib import *
-from jobs.prepare_complaint_raw_dataset.__init__ import prepare_query
 from requests.utils import requote_uri
-
 spark = SparkSession.builder.getOrCreate()
 sc = spark.sparkContext
 log4jLogger = sc._jvm.org.apache.log4j
@@ -37,7 +35,7 @@ class CheckpointInfo:
         self.task_type = None
         self.source ='Hdfs'
         self.sink = 'Hdfs'
-    
+
     def generate_end_dt(self, duration_in_secs = 0):
         self.end_dt = self.start_dt + timedelta(seconds=duration_in_secs)
         return self.end_dt
@@ -51,7 +49,7 @@ class CheckpointInfo:
     def update_task_type(self,task_type):
         self.task_type = task_type
         return self
-      
+           
     def update_query_params(self, old_ckpt):
         old_end_time = old_ckpt.query_params.get('end_dt', None)
         if not old_end_time:
@@ -63,7 +61,7 @@ class CheckpointInfo:
         brands = old_ckpt.query_params.get('brand',None)
         self.query_params['brand']= brands
         return self
-    
+
     def update_in_db(self,spark,config):
         print('## Updating checkpoint in DB\n{}'.format(self))
         schema = StructType([
@@ -112,12 +110,12 @@ class CheckpointInfo:
             Run Status: {self.run_status}
             Task Type:{self.task_type}
             Query Param: {self.query_params}
+            Input Param:{self.input_param}
             Source: {self.source}
             Sink:{self.sink}
         '''
 
-
-def read_last_checkpoint_info(spark, config):
+def read_last_checkpoint_info(spark, config, query):
     logger.info('## Reading last checkpoint ##')
     db_host = glom(config, 'read_config.checkpoint.db_host')
     database =  glom(config, 'read_config.checkpoint.database')
@@ -128,7 +126,7 @@ def read_last_checkpoint_info(spark, config):
     jdbcDF2 = spark.read.format("jdbc").\
         options(
             url='jdbc:postgresql://{}/{}'.format(db_host,database),
-            query=prepare_query(config),
+            query=query,
             user='{}'.format(usern),
             password='{}'.format(pwd),
             driver='{}'.format(driver)).\

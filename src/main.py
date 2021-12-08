@@ -7,7 +7,7 @@ import sys
 from dotenv import dotenv_values, load_dotenv
 import json 
 #import logging
-import logger
+# import logger
 from pyspark import SparkContext
 
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     job_args = dict()
     if args.job_args:
         job_args_tuples = [arg_str.split('=') for arg_str in args.job_args]
-        logger.info('job_args_tuples: %s' % job_args_tuples)
+        print('job_args_tuples: %s' % job_args_tuples)
         job_args = {a[0]: a[1] for a in job_args_tuples}
 
     print('\nRunning job %s...\nenvironment is %s\n' % (args.job_name, environment))
@@ -85,15 +85,13 @@ if __name__ == '__main__':
     sc = spark.sparkContext
     
     log4jLogger = sc._jvm.org.apache.log4j
-    log = log4jLogger.LogManager.getLogger(__name__)
-    log.info('Setting log level to WARNING NOW.')
-    level = sc.setLogLevel("WARN")
-    log.warn('First log after warning.')
-    
+    logger = log4jLogger.LogManager.getLogger(__name__)
+    logger.info('Importing job specific module.')
+
     job_module = importlib.import_module('jobs.%s' % args.job_name)
     start = time.time()
     # TODO: Supply Config to the job as argument.
-    job_module.analyze(spark, sc, config, **job_args)
+    # job_module.analyze(spark, sc, config, **job_args)
     end = time.time()
 
-    log.error("\nExecution of job %s took %s seconds" % (args.job_name, end-start))
+    logger.error("\nExecution of job %s took %s seconds" % (args.job_name, end-start))
