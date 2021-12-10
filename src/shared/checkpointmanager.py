@@ -139,11 +139,12 @@ def read_last_checkpoint_info(spark, config, query):
     l_ckpt.query_params = json.loads(l_checkpoint_info.source_query_param)
     start_dt = l_ckpt.query_params['start_dt']
     end_dt = l_ckpt.query_params['end_dt']
-    Brand = l_ckpt.query_params['brand']
 
     l_ckpt.query_params['start_dt'] = datetime.fromisoformat(start_dt)
     l_ckpt.query_params['end_dt'] = datetime.fromisoformat(end_dt)
-    l_ckpt.query_params['brand'] = Brand
+    if task =="prepare_complaint_data":
+        Brand = l_ckpt.query_params['brand']
+        l_ckpt.query_params['brand'] = Brand
     
     l_ckpt.run_id = l_checkpoint_info.run_id
     l_ckpt.run_end_at = datetime.fromisoformat(l_checkpoint_info.run_end_at)

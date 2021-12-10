@@ -9,8 +9,10 @@ import datetime
 import uuid
 from main import load_config
 from pyspark.sql.functions import lit
-from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info
-import glom
+from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
+from glom import glom
+import traceback
+
 __author__ = 'gaurav'
 
 # logger = logging.getLogger()
@@ -48,15 +50,6 @@ def prepare_db_uri(config):
 #     password='postgres',
 #     driver='org.postgresql.Driver').\
 #     load()
-
-
-def prepare_query(config):
-    schema =  glom(config, 'read_config.checkpoint.schema')
-    table =  glom(config, 'read_config.checkpoint.table')
-    task = glom(config,'partition_info.task_type')
-    query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task)
-    return query
-
 
 def read_data_from_source(ckpt_info, config, spark):
     logger.info('####\n\n {}'.format(config))
@@ -113,29 +106,30 @@ def copy_data_to_sink(df, sink_options, curr_ckpt_info):
 
 
 def prepare_query(config):
-    schema = glom(config, 'read_config.checkpoint.schema')
-    table = glom(config, 'read_config.checkpoint.table')
-    task = glom(config, 'partition_info.task_type')
+    schema =  glom(config, 'read_config.checkpoint.schema')
+    table =  glom(config, 'read_config.checkpoint.table')
+    task = glom(config,'partition_info.task_type')
     query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task)
     return query
 
 def analyze(spark, sc, config):
     # Prepare meta-data.
     logger.info('## Loading configuration ##')
-    logger.warn('## Loading configuration ##')
     input_uri = prepare_db_uri(config)
     config.update({'input_uri': input_uri})
     write_con = config.get('write_config',None)
     sink_folder = write_con.get('data', {}).get('folder', None)
     sink_options = {'sink_folder': sink_folder}
-    run_info = prepare_run_info()
+    run_info = prepare_run_info(config)
+    task_type = prepare_task_type(config)
     curr_ckpt_info = CheckpointInfo()
     logger.info("Source to Sink: {} --> {}".format(input_uri, sink_folder))
     try:
         query = prepare_query(config)
-        l_ckpt_info = read_last_checkpoint_info(spark, config, query)
+        #print("------------------------",query)
+        l_ckpt_info = read_last_checkpoint_info(spark, config,query)
         l_ckpt_info, curr_ckpt_info = prepare_checkpoint_info(l_ckpt_info, 
-                                                            run_info, spark, 
+                                                            run_info, spark, task_type,
                                                             curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'
         curr_ckpt_info.update_in_db(spark,config)
@@ -152,9 +146,13 @@ def analyze(spark, sc, config):
         logger.info('## Printing dataframe sample.')
         df.show(5)
         curr_ckpt_info.run_status = 'SUCCESS'
-    except Exception as e:
+    except Exception as ex:
+        strace = ''.join(traceback.format_exception(etype=type(ex),
+                                                    value=ex,
+                                                    tb=ex.__traceback__))
+        logger.error(strace)
+        curr_ckpt_info.run_status = 'ERROR'
         # TODO: Ensure copying wasn't done. If it did, then rollback.
-        print(e)
         curr_ckpt_info.run_status = 'ERROR'
     finally:
         curr_ckpt_info.run_end_at = datetime.datetime.now()
