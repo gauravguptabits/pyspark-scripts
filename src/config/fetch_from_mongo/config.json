@@ -44,7 +44,6 @@
         "spark.driver.memory": "1g"
     },
     "partition_info" :{
-        "category": "Consumer Electronics",  
         "task_type": "fetch_from_mongo"
     }
 
