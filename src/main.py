@@ -91,7 +91,7 @@ if __name__ == '__main__':
     job_module = importlib.import_module('jobs.%s' % args.job_name)
     start = time.time()
     # TODO: Supply Config to the job as argument.
-    # job_module.analyze(spark, sc, config, **job_args)
+    job_module.analyze(spark, sc, config, **job_args)
     end = time.time()
 
     logger.error("\nExecution of job %s took %s seconds" % (args.job_name, end-start))
