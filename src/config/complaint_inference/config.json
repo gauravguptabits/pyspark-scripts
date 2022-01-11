@@ -1,0 +1,30 @@
+{
+    "read_config": {
+        "checkpoint": {
+        },
+        "data": {
+            "store_name": "HDFS",
+            "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/Panasonic_parquet"
+        },
+        "ml_model": {
+            "vectorizer": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/experiments/RF_FBeta_8424_Dec31/vectorizer.pickle",
+            "classifier": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/experiments/RF_FBeta_8424_Dec31/classifier.pickle"
+        }
+        
+},
+    "write_config": {
+        "checkpoint": {
+        },
+        "data": {
+            "store_name": "HDFS",    
+            "folder": "/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/Panasonic_predict2"
+        }
+    },
+    "spark_conf": {
+        "spark.executor.memory": "4g",
+        "spark.executor.cores": "20",
+        "spark.driver.memory": "1g"
+    }
+
+}    
+
