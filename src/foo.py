@@ -6,130 +6,112 @@ except:
     findspark.init()
     import pyspark
 from pyspark.sql import SparkSession
-
+import pandas as pd
+import pickle
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType, DateType, MapType
 import datetime
 import uuid
 import json
 from pyspark.sql.functions import col
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.functions import lit
+from random import randrange
+
+__author__ = 'Gaurav Gupta'
+root = '/home/gaurav.gupta/projects/PoCs/brandMention/brand_ml'
+experiment_name = 'RF_FBeta_8424_Dec31'
+bc_vectorizer, bc_classifier = None, None
 
 
-class CheckpointInfo:
-    def __init__(self):
-        self.query_params = {
-            'start_dt': None,
-            'end_dt': None
-        }
-        self.source = 'MONGO'
-        self.sink = 'HDFS'
-        self.run_id = None
-        self.run_started_at = None
-        self.run_status = None
-        self.run_end_at = None
+def get_epoch_time():
+    ep = datetime.datetime(1970, 1, 1, 0, 0, 0)
+    x = (datetime.datetime.utcnow() - ep).total_seconds()
+    return x
 
-    def update_in_db(self, spark):
-        QueryParamType = MapType(StringType(), StringType())
-        schema = StructType([
-            StructField("source", StringType(), True),
-            StructField("sink", StringType(), True),
-            StructField("run_started_at", StringType(), True),
-            StructField("run_id", StringType(), True),
-            StructField("run_end_at", StringType(), True),
-            StructField("run_status", StringType(), True),
-            StructField("source_query_param", StringType(), True)
-        ])
-        data = {
-            'source': self.source,
-            'sink': self.sink,
-            'run_started_at': self.run_started_at.isoformat(),
-            'run_end_at': self.run_end_at.isoformat(),
-            'run_id': str(self.run_id),
-            'run_status': self.run_status,
-            'source_query_param': json.dumps(self.query_params, default=str)
-        }
-        df = spark.createDataFrame([data], schema=schema)
-        df.write.format('jdbc')\
-            .options(
-                url='jdbc:postgresql://localhost:5432/Migration_Catalogue',
-                dbtable='migration_checkpoints."Checkpoint"',
-                user='postgres',
-                password='postgres',
-                driver='org.postgresql.Driver'
-        ).mode('append').save()
-        return
-    
-def test_checkpoint_writing(spark):
-    ckpt = CheckpointInfo()
-    ckpt.source = 'SPARK'
-    ckpt.sink = 'HDFS'
-    ckpt.run_id = uuid.uuid1()
-    ckpt.run_status = 'SUCCESS'
-    ckpt.run_started_at = datetime.datetime.now()
-    ckpt.run_end_at = ckpt.run_started_at + datetime.timedelta(seconds=600)
-    ckpt.query_params = {
-        'start_dt': datetime.datetime.now(),
-        'end_dt': datetime.datetime.now()
-    }
-    print('#### Updating in DB #####')
-    ckpt.update_in_db(spark)
-    print('#### END of SCRIPT #####')
-    return
+def load_model(experiment_name):
 
-def read_from_mongo(spark):
-    input_uri = 'mongodb://localhost:27017/bigdata'
-    database = 'bigdata'
-    collection = 'twitterStreamData'
-    
-    start = datetime.datetime(2021, 10, 22, 0, 0, 0)
-    end = datetime.datetime(2021, 10, 23, 0, 0, 0)
+    # pickle.dump(tfidf, open("./models/tfidf_rf_f1_9371.pickle", "wb"))
+    # dump(clf, './models/rf_f1_9371.joblib')
+    experiment_path = f"{root}/experiments/{experiment_name}"
+    vectorizer = pickle.load(open(f"{experiment_path}/vectorizer.pickle", "rb"))
+    clf = pickle.load(open(f"{experiment_path}/classifier.pickle", 'rb'))
+    model_dict = {'classifier': clf, 'vectorizer': vectorizer}
+    return model_dict
 
-    agg_query = [{
-        '$match': {
-            'tweetInfo.created_at': {
-                '$gte': { 
-                    "$date": start.strftime("%Y-%m-%dT%H:%M:%SZ")
-                },
-                '$lt': {
-                    "$date": end.strftime("%Y-%m-%dT%H:%M:%SZ")
-                }
-            }
-        }
-    }]
-    # .option("inferSchema", "true")\
-    # .option("partitioner", "MongoPaginateBySizePartitioner")\
 
-    print('#####Mongo Query####\n\n\n{}\n\n'.format(agg_query))
-    df = spark.read.format("mongo")\
-        .option("uri", input_uri)\
-        .option("database", database)\
-        .option("sampleSize", 50000)\
-        .option("collection", collection)\
-        .option("pipeline", agg_query)\
-        .load()
+def tfidf_to_text(vectors, tfidf):
+    list_of_tokens = tfidf.inverse_transform(vectors)
+    return list(map(lambda tokens: ' '.join(tokens), list_of_tokens))
+
+
+def read_data(spark):
+    sample_text = [("This is such a poor product. It didnot worked for even 1 day",),
+                   ("#panasonicindia I twitted again and again but yet my complaint is not solved",),
+                   ("@PanasonicIndia Ive a 32 LCD/LED Model No. TH-W32ES48DX in which I'm unable to see Netflix under the Market Apps section. How do I fix this?",),
+                   ("Disposed my laptop successfully with the help of @PanasonicIndia #DiwaliwaliSafai #PanasonicIndia Join @chidambar08 @dayalojha_ @AswaniJaishree",),
+                   ("Panasonic's Akhil Sethi joins Harman India as digital marketing head #HarmanIndia #Panasonic #AkhilSethi #Vivo #Isobar #Devices #PanasonicIndia",),
+                   ]
+
+    cols = ['text']
+    df = spark.createDataFrame(data=sample_text, schema=cols)
     return df
 
 
-def record_iterator(iterator):
-    _ids = [rec.tweetInfo.text for rec in iterator]
-    # print(_ids)
-    print('###\n\nTotal items in partition: {}\n\n###'.format(len(_ids)))
-    print(_ids[0:10])
+def prediction_service(sample_text, vectorizer, clf):
+
+    sample_df = pd.DataFrame(data={'text': [sample_text]})
+    # sample_df = process_data(sample_df, print_stats=False)
+    sample_vector = vectorizer.transform(sample_df['text'])
+    ans = clf.predict(sample_vector)
+    sample_df['Prediction'] = ans
+    return sample_df
+
+
+def predict(row):
+    tfidf = bc_vectorizer
+    clf = bc_classifier
+    prediction = prediction_service(row.text, vectorizer=tfidf.value, clf=clf.value)
+    ans = prediction['Prediction'].loc[0].item()
+    return (row.text, ans, )
 
 if __name__ == '__main__':
     spark = SparkSession.\
                 builder.\
-                config("spark.mongodb.input.partitioner", "MongoSamplePartitioner").\
-                config("spark.mongodb.input.partitionerOptions.partitionSizeMB", "128").\
-                config("spark.mongodb.input.partitionerOptions.partitionKey", "brand").\
                 getOrCreate()
-    df = read_from_mongo(spark)
-    print('## Num of docs: {}'.format(df.count()))
-    df.show(4)
-    # df.foreachPartition(record_iterator)
-    df.select(
-        col('brand'),
-        col('category'),
-        col('req_id'),
-        col("tweetInfo").cast('string')).show()
-    print('#### Creating Checkpoint. #####')
+
+    local_source_folder = '/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/Panasonic_parquet'
+    local_sink_folder = '/home/gaurav.gupta/projects/PoCs/brandMention/pyspark-scripts/data/Panasonic_predict'
+    num_of_cores = 20
+    num_of_partiotions = 5*num_of_cores
+    remote_source_folder = 'hdfs://172.20.22.198:9820/new_datasets/Panasonic'
+
+    sc = spark.sparkContext
+    log4jLogger = sc._jvm.org.apache.log4j
+    logger = log4jLogger.LogManager.getLogger(__name__)
+    logger.info(f'Starting to read.')
+
+    model_dict = load_model(experiment_name)
+    bc_vectorizer = spark.sparkContext.broadcast(model_dict['vectorizer'])
+    bc_classifier = spark.sparkContext.broadcast(model_dict['classifier'])
+
+    t_before_read = get_epoch_time()
+    df = spark.read.parquet(remote_source_folder)
+    num_of_records = df.count()
+    t_after_read = get_epoch_time()
+    logger.error(f'Time: {t_after_read - t_before_read}\t#Records: {num_of_records}')
+
+    df = df.repartition(num_of_partiotions)
+    t_before = get_epoch_time()
+    rdd2 = df.rdd.map(predict)
+    df2 = rdd2.toDF(['text', 'Complaint'])
+
+    t_before = get_epoch_time()
+    df2\
+        .repartition(num_of_partiotions)\
+        .write\
+        .option("header", True) \
+        .mode('overwrite')\
+        .parquet(local_sink_folder)
+    t_after = get_epoch_time()
+    logger.error(f'Time taken in writing - {t_after - t_before} sec.')
