@@ -62,7 +62,7 @@ def analyze(spark, sc, config):
     vectorizer_path = glom(config, 'read_config.ml_model.vectorizer')
     classifier_path = glom(config, 'read_config.ml_model.classifier')
 
-    num_of_cores = 8
+    num_of_cores = 20
     num_of_partiotions = 5*num_of_cores
 
     log_metrics = [
@@ -87,7 +87,7 @@ def analyze(spark, sc, config):
     logger.info(f'Loading data from parquet format...')
     df = spark.read.parquet(source)
     
-    df = df.sample(False, 0.1, 0)
+    # df = df.sample(False, 0.1, 0)
     df = df.repartition(num_of_partiotions)
     t_before = get_epoch_time()
     prediction_mapper_fn = predict(bc_vectorizer, bc_classifier)
