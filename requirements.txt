@@ -2,3 +2,8 @@ tabulate
 pymaybe
 python-dotenv
 glom
+ftfy
+# scrubadub
+demoji
+# contractions
+# nltk

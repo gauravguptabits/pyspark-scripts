@@ -1,13 +1,16 @@
 import datetime
 import pickle
 import pandas as pd
-from pyspark.sql import SparkSession
 from glom import glom
 from tabulate import tabulate
+from .helper import process_data
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+import scrubadub
 
 __author__ = 'Gaurav Gupta'
 
-# bc_vectorizer, bc_classifier = 1, 2
+# table = str.maketrans("", "")
 
 def get_epoch_time():
     ep = datetime.datetime(1970, 1, 1, 0, 0, 0)
@@ -42,15 +45,47 @@ def predict(bc_vectorizer, bc_classifier):
         clf = bc_classifier
         prediction = prediction_service(row.text, vectorizer=tfidf.value, clf=clf.value)
         ans = prediction['Prediction'].loc[0].item()
-        return (row.text, ans, )
+        return (row[0], row[1], ans, )
 
     return _predict
 
+
+def process_text_interface_fn(bc_lemmatizer, bc_stopwords, bc_email_detector):
+
+    def _process_text_interface_fn(row):
+        options = {
+            'handle_unicode': True,
+            'handle_emoji': True,
+            'handle_email': True,
+            'handle_username': True,
+            'handle_hashtags': True,
+            'handle_url': True,
+            'handle_markup': True,
+            'handle_retweet': False,
+            'handle_case': True,
+            'handle_lemmatization': True,
+            'handle_stopwords': True,
+            'handle_punctuation': True,
+            'handle_contractions': True,
+            'print_stats': False
+        }
+        pdf = pd.DataFrame(data={'text': [row.text]})
+        # print(pdf) 
+        pdf = process_data( pdf, 
+                            lemmatizer = bc_lemmatizer.value, 
+                            stopwords = bc_stopwords.value,
+                            emailDetector=bc_email_detector.value,
+                            **options
+                        )
+        orig_text = list(pdf['orig_text'])[0]
+        prepped_text = list(pdf['text'])[0]
+        return (orig_text, prepped_text,)
+
+    return _process_text_interface_fn
 """
 Run scikit learn predictive model to work on distributive load.
 """
 def analyze(spark, sc, config):
-    global bc_classifier, bc_vectorizer
     # spark = SparkSession.builder.getOrCreate()
     log4jLogger = sc._jvm.org.apache.log4j
     logger = log4jLogger.LogManager.getLogger(__name__)
@@ -64,6 +99,12 @@ def analyze(spark, sc, config):
 
     num_of_cores = 20
     num_of_partiotions = 5*num_of_cores
+
+
+    wnl = WordNetLemmatizer()
+    stop = stopwords.words('english')
+    stop.extend(['panasonic'])
+    emailDetector = scrubadub.Scrubber(detector_list=[scrubadub.detectors.EmailDetector])
 
     log_metrics = [
         ('Key', 'Value'), 
@@ -82,6 +123,9 @@ def analyze(spark, sc, config):
     logger.info(f"Classifier: {type(model_dict['classifier'])}")
     bc_vectorizer = spark.sparkContext.broadcast(model_dict['vectorizer'])
     bc_classifier = spark.sparkContext.broadcast(model_dict['classifier'])
+    bc_lemmatizer = spark.sparkContext.broadcast(wnl)
+    bc_stopwords = spark.sparkContext.broadcast(stop)
+    bc_email_detector = spark.sparkContext.broadcast(emailDetector)
 
     # PERFORMING ETL
     logger.info(f'Loading data from parquet format...')
@@ -90,9 +134,16 @@ def analyze(spark, sc, config):
     # df = df.sample(False, 0.1, 0)
     df = df.repartition(num_of_partiotions)
     t_before = get_epoch_time()
+
+    # Task Initializations
     prediction_mapper_fn = predict(bc_vectorizer, bc_classifier)
-    rdd2 = df.rdd.map(prediction_mapper_fn)
-    df2 = rdd2.toDF(['text', 'Complaint'])
+    prepped_data_fn = process_text_interface_fn(bc_lemmatizer, 
+                                                bc_stopwords, 
+                                                bc_email_detector)
+
+    # Task Definition
+    df2 = df.rdd.map(prepped_data_fn).toDF(['Orig_text', 'text'])
+    df2 = df2.rdd.map(prediction_mapper_fn).toDF(['Orig_text', 'text', 'Complaint'])
 
     logger.info(f'Writing back to disk...')
     t_before = get_epoch_time()

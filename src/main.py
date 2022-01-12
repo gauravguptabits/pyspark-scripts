@@ -8,7 +8,6 @@ from dotenv import dotenv_values, load_dotenv
 import json 
 #import logging
 # import logger
-from pyspark import SparkContext
 
 
 if os.path.exists('libs.zip'):
@@ -29,7 +28,6 @@ except:
     findspark.init()
     import pyspark
 from pyspark.sql import SparkSession
-import numpy
 
 __author__ = 'Impressico'
 
