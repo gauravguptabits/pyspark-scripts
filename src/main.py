@@ -77,8 +77,8 @@ if __name__ == '__main__':
     sparkcon = config.get('spark_conf',None)
 
     sparkBuilder = SparkSession.builder
-    for k,v in sparkcon.items():
-        sparkBuilder = sparkBuilder.config(k,v)
+    # for k,v in sparkcon.items():
+    #    sparkBuilder = sparkBuilder.config(k,v)
     spark = sparkBuilder.getOrCreate()
     sc = spark.sparkContext
     
