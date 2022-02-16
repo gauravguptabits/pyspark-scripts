@@ -91,7 +91,6 @@ def transform_data(data):
 def copy_data_to_sink(df, sink_options, curr_ckpt_info):
     # TODO: prevent entry of duplicate into the HDFS.
     sink_folder = sink_options.get('sink_folder', None)
-    
     df.select(
             col('brand'), 
             col('category'), 
@@ -99,7 +98,7 @@ def copy_data_to_sink(df, sink_options, curr_ckpt_info):
             col("tweetInfo")) \
         .write \
         .option("header", True) \
-        .partitionBy(["category", "brand", "created_at"]) \
+        .partitionBy(["category","brand","created_at"]) \
         .mode("append") \
         .json(sink_folder)
     return df
@@ -124,6 +123,7 @@ def analyze(spark, sc, config):
     task_type = prepare_task_type(config)
     curr_ckpt_info = CheckpointInfo()
     logger.info("Source to Sink: {} --> {}".format(input_uri, sink_folder))
+ 
     try:
         query = prepare_query(config)
         #print("------------------------",query)
