@@ -21,7 +21,7 @@ from requests.utils import requote_uri
 from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
 import traceback
 from os import path
-__author__ = 'gaurav'
+__author__ = 'gaurav gupta'
 
 spark = SparkSession.builder.getOrCreate()
 sc = spark.sparkContext
