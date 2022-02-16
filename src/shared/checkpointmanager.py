@@ -59,7 +59,7 @@ class CheckpointInfo:
 
         self.query_params['start_dt'] = old_end_time
         # 1 day long job
-        self.query_params['end_dt'] = old_end_time + timedelta(days=1)
+        self.query_params['end_dt'] = old_end_time + timedelta(days=1794)
         brands = old_ckpt.query_params.get('brand',None)
         self.query_params['brand']= brands
         return self
@@ -142,10 +142,12 @@ def read_last_checkpoint_info(spark, config, query):
 
     l_ckpt.query_params['start_dt'] = datetime.fromisoformat(start_dt)
     l_ckpt.query_params['end_dt'] = datetime.fromisoformat(end_dt)
-    if task =="prepare_complaint_data":
-        Brand = l_ckpt.query_params['brand']
-        l_ckpt.query_params['brand'] = Brand
-    
+    #if task =="prepare_complaint_data":
+    #    Brand = l_ckpt.query_params['brand']
+    #    l_ckpt.query_params['brand'] = Brand
+    Brand = l_ckpt.query_params['brand']
+    l_ckpt.query_params['brand'] = Brand
+
     l_ckpt.run_id = l_checkpoint_info.run_id
     l_ckpt.run_end_at = datetime.fromisoformat(l_checkpoint_info.run_end_at)
     l_ckpt.run_started_at = datetime.fromisoformat(l_checkpoint_info.run_started_at)

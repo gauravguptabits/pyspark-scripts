@@ -21,21 +21,12 @@ from requests.utils import requote_uri
 from shared.checkpointmanager import CheckpointInfo,read_last_checkpoint_info,prepare_checkpoint_info,prepare_run_info,prepare_task_type
 import traceback
 from os import path
-__author__ = 'gaurav'
+__author__ = 'gaurav gupta'
 
 spark = SparkSession.builder.getOrCreate()
 sc = spark.sparkContext
 log4jLogger = sc._jvm.org.apache.log4j
 logger = log4jLogger.LogManager.getLogger(__name__)
-
-
-def prepare_query(config):
-    schema =  glom(config, 'read_config.checkpoint.schema')
-    table =  glom(config, 'read_config.checkpoint.table')
-    brands = glom(config,'partition_info.brand')
-    task = glom(config,'partition_info.task_type')
-    query='select * from {}."{}" where task_type=\'{}\' and run_status = \'SUCCESS\' and source_query_param:: json->>\'brand\' =\'{}\' order by run_started_at desc NULLS LAST limit 1'.format(schema,table,task,brands)
-    return query
 
 
 def _generate_part_file_location(curated_partition_info):
@@ -71,14 +62,16 @@ def read_data_part(spark, path):
 
 def transform_df(df):
     # user defined func to extract text field
-    
+    extract_id_udf = F.udf(lambda row: row.id, StringType())
+    extract_created_at_udf = F.udf(lambda row: row.created_at, StringType())
     extract_text_udf = F.udf(lambda row: row.text, StringType())
-        # created_at = glom(partition_info, 'created_at')
-
-    df2 = df.withColumn("text", extract_text_udf(col("tweetInfo")))
+    
+    df2 = df.withColumn("id", extract_id_udf(col("tweetInfo")))
+    df2 = df2.withColumn("created_at", extract_created_at_udf(col("tweetInfo")))
+    df2 = df2.withColumn("text", extract_text_udf(col("tweetInfo")))
+    
     df.unpersist()
     df2 = df2.drop(col('tweetInfo'))
-        # df2 = df2.withColumn("created_at", F.lit(created_at))
     df2 = df2.withColumn("source", F.lit('Twitter'))
     return df2
 def write_to_sink(df, config):
@@ -88,7 +81,7 @@ def write_to_sink(df, config):
     df.write \
         .option("header", True) \
         .mode("append") \
-        .json(sink_folder)
+        .parquet(sink_folder)
     return    
 
 def prepare_query(config):
@@ -123,10 +116,12 @@ def analyze(spark, sc, config):
         file_paths = _generate_part_files_location(config,curr_ckpt_info)
         curr_ckpt_info.run_status = 'RUNNING'
         curr_ckpt_info.update_in_db(spark,config)
+        
         for fpath in file_paths:
-            if path.exists(fpath):  
+            if 1==1: #path.exists(fpath):  
                 df = read_data_part(spark, fpath)
                 df = transform_df(df)
+                
                 try:    
                     write_to_sink(df,config)
                     run_info['run_end_at'] = datetime.now()

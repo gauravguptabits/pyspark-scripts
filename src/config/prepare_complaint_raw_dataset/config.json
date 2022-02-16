@@ -6,13 +6,13 @@
             "password": "postgres",
             "database" : "Migration_Catalogue",
             "schema": "migration_checkpoints",
-            "table": "Checkpoint_2",
+            "table": "checkpoints",
             "driver" : "org.postgresql.Driver",
-            "db_host": "localhost:5432"
+            "db_host": "172.20.23.143:5432"
         },
         "data": {
             "store_name": "HDFS",
-            "folder": "/home/simran.tyagi/pyspark-scripts/data/datastore"
+            "folder": "hdfs://172.20.22.198:9820/datastores"
         }
     },
     "write_config": {
@@ -22,13 +22,13 @@
             "password" :"postgres",
             "database" : "Migration_Catalogue",
             "schema" :"migration_checkpoints",
-            "table" :"Checkpoint_2",
+            "table" :"checkpoints",
             "driver" : "org.postgresql.Driver",
-            "db_host" :"localhost:5432"
+            "db_host" :"172.20.23.143:5432"
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "/home/simran.tyagi/pyspark-scripts/data/datasets"
+        "folder": "hdfs://172.20.22.198:9820/parquet_datastore"
         }
     },
     "spark_conf": {
@@ -36,7 +36,7 @@
     },
     "partition_info" :{
         "category": "Consumer Electronics",  
-        "brand" : "Hitachi",
+        "brand" : "Panasonic",
         "task_type" :"prepare_complaint_data"
     }
 

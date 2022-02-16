@@ -79,6 +79,7 @@ def process_text_interface_fn(bc_lemmatizer, bc_stopwords, bc_email_detector):
                         )
         orig_text = list(pdf['orig_text'])[0]
         prepped_text = list(pdf['text'])[0]
+        # prepped_text = prepped_text .replace('HASHTAG', '').replace('HANDLE', '').replace('URL', '').replace('rt', '')
         return (orig_text, prepped_text,)
 
     return _process_text_interface_fn
@@ -98,7 +99,7 @@ def analyze(spark, sc, config):
     classifier_path = glom(config, 'read_config.ml_model.classifier')
 
     num_of_cores = 20
-    num_of_partiotions = 5*num_of_cores
+    num_of_partiotions = 3*num_of_cores
 
 
     wnl = WordNetLemmatizer()

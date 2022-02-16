@@ -6,15 +6,15 @@
             "password": "postgres",
             "database" : "Migration_Catalogue",
             "schema": "migration_checkpoints",
-            "table": "Checkpoint",
+            "table": "checkpoints",
             "driver" : "org.postgresql.Driver",
-            "db_host": "localhost:5432"
+            "db_host": "172.20.23.143:5432"
         },
         "data": {
             "store_name": "MONGO",
-            "db_name": "bigdata",
-            "collection": "twitterStreamData",
-            "db_host": "localhost:27017"
+            "db_name": "bigdata_rest_v2",
+            "collection": "twitterData",
+            "db_host": "172.20.23.143:27017"
         }
         
 },
@@ -25,13 +25,13 @@
             "password" :"postgres",
             "database" : "Migration_Catalogue",
             "schema" :"migration_checkpoints",
-            "table" :"Checkpoint",
+            "table" :"checkpoints",
             "driver" : "org.postgresql.Driver",
-            "db_host" :"localhost:5432"
+            "db_host" :"172.20.23.143:5432"
     },
     "data": {
         "store_name": "HDFS",    
-        "folder": "datastore"
+        "folder": "hdfs://172.20.22.198:9820/fix_mongo_data"
     
     }
     },
